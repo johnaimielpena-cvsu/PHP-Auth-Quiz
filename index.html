@@ -444,6 +444,20 @@
     </div>
   </div>
 
+  <!-- ══════════════════ ALREADY SUBMITTED SCREEN ══════════════════ -->
+  <div class="screen" id="screen-done">
+    <div class="card" style="text-align:center;">
+      <div class="badge">Session Active</div>
+      <div style="font-size:3.5rem; margin: 1rem 0;">🔒</div>
+      <h1 style="font-size:1.6rem;">Quiz Already <span>Submitted</span></h1>
+      <p class="subtitle" style="margin-top:.6rem;">You have already completed this quiz in this session. Your result has been recorded.</p>
+      <div class="result-meta" id="done-meta" style="margin-top:1.5rem; text-align:left;"></div>
+      <p style="margin-top:1.5rem; font-size:.8rem; color:var(--muted); font-family:'Space Mono',monospace;">
+        To retake, ask your instructor to reset your session.
+      </p>
+    </div>
+  </div>
+
   <!-- ══════════════════ RESULTS SCREEN ══════════════════ -->
   <div class="screen" id="screen-results">
     <div class="card">
@@ -460,7 +474,6 @@
       <div class="result-breakdown" id="result-breakdown"></div>
 
       <div class="submit-status" id="submit-status"></div>
-      <button class="btn-restart" onclick="restartQuiz()">↺ Retake Quiz</button>
     </div>
   </div>
 
@@ -564,9 +577,26 @@ const QUESTIONS = [
 ];
 
 // ════════════════════════════════════════
+//  SESSION CHECK (sessionStorage)
+// ════════════════════════════════════════
+(function checkSession() {
+  const saved = sessionStorage.getItem('quiz_submitted');
+  if (saved) {
+    const data = JSON.parse(saved);
+    document.getElementById('done-meta').innerHTML =
+      `<strong>${data.name}</strong> &nbsp;|&nbsp; ${data.email}` +
+      (data.section ? ` &nbsp;|&nbsp; ${data.section}` : '') +
+      `<br/>Score: <strong style="color:var(--accent)">${data.score}/${data.total} (${data.pct}%)</strong>` +
+      `<br/>Submitted: ${new Date(data.date).toLocaleString()}`;
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('screen-done').classList.add('active');
+  }
+})();
+
+// ════════════════════════════════════════
 //  STATE
 // ════════════════════════════════════════
-const TIMER_SECONDS = 90; // 3 minutes
+const TIMER_SECONDS = 180; // 3 minutes
 const CIRCUMFERENCE = 2 * Math.PI * 20; // ~125.66
 
 let student = {};
