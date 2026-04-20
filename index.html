@@ -346,6 +346,18 @@
     }
     .btn-restart:hover { border-color: var(--text); color: var(--text); }
 
+    .submit-status {
+      margin-top: 1.2rem;
+      padding: .75rem 1rem;
+      border-radius: 8px;
+      font-family: 'Space Mono', monospace;
+      font-size: .8rem;
+      display: none;
+    }
+    .submit-status.submitting { display: block; background: rgba(255,209,102,.1); color: var(--accent3); border: 1px solid rgba(255,209,102,.25); }
+    .submit-status.success    { display: block; background: rgba(0,229,160,.1);  color: var(--accent);  border: 1px solid rgba(0,229,160,.25); }
+    .submit-status.error      { display: block; background: rgba(255,77,109,.1); color: var(--accent2); border: 1px solid rgba(255,77,109,.25); }
+
     /* ─── DIVIDER ─── */
     .divider { border: none; border-top: 1px solid var(--border); margin: 1.5rem 0; }
 
@@ -447,6 +459,7 @@
       <h2 style="font-size:1rem; margin-bottom:1rem; color:var(--muted); text-transform:uppercase; letter-spacing:.08em;">Review</h2>
       <div class="result-breakdown" id="result-breakdown"></div>
 
+      <div class="submit-status" id="submit-status"></div>
       <button class="btn-restart" onclick="restartQuiz()">↺ Retake Quiz</button>
     </div>
   </div>
@@ -760,31 +773,47 @@ function showResults() {
     breakdown.appendChild(el);
   });
 
-  // Save to localStorage for the teacher's reference
-  saveResult(pct, endTime);
   showScreen('screen-results');
+  saveResult(pct, endTime);
 }
 
-function saveResult(pct, endTime) {
-  const record = {
+async function saveResult(pct, endTime) {
+  const SHEET_URL = 'https://script.google.com/macros/s/AKfycbw12YJ95KhZGv29weN1BiVvjzSPDkHlMaU4RKBl8N6k1e_hlbg31kiJh0VWrLRkGrUL/exec';
+
+  const answerSummary = answers.map((a, i) => {
+    const q = QUESTIONS[a.q];
+    const chosen = a.selected !== null ? q.opts[a.selected] : 'Timed out';
+    return `Q${i+1}: ${a.correct ? '✓' : '✗'} ${chosen}`;
+  }).join(' | ');
+
+  const payload = {
     name: `${student.fname} ${student.lname}`,
     email: student.email,
-    section: student.section,
+    section: student.section || '—',
     score: score,
     total: QUESTIONS.length,
     pct,
-    date: endTime,
-    answers: answers.map(a => ({
-      question: QUESTIONS[a.q].q,
-      selected: a.selected !== null ? QUESTIONS[a.q].opts[a.selected] : 'Timed out',
-      correct: QUESTIONS[a.q].opts[QUESTIONS[a.q].ans],
-      isCorrect: a.correct
-    }))
+    answers: answerSummary
   };
 
-  const stored = JSON.parse(localStorage.getItem('quiz_results') || '[]');
-  stored.push(record);
-  localStorage.setItem('quiz_results', JSON.stringify(stored));
+  // Show submitting status
+  const statusEl = document.getElementById('submit-status');
+  statusEl.className = 'submit-status submitting';
+  statusEl.textContent = '⏳ Submitting your result to Google Sheets…';
+
+  try {
+    await fetch(SHEET_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    statusEl.className = 'submit-status success';
+    statusEl.textContent = '✓ Result recorded to Google Sheets!';
+  } catch (err) {
+    statusEl.className = 'submit-status error';
+    statusEl.textContent = '✗ Could not submit — check your internet connection.';
+  }
 }
 
 // ════════════════════════════════════════
