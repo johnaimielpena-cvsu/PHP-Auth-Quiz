@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>PHP Auth Quiz</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --bg: #0d0d0d;
+      --surface: #161616;
+      --surface2: #1e1e1e;
+      --border: #2a2a2a;
+      --accent: #00e5a0;
+      --accent2: #ff4d6d;
+      --accent3: #ffd166;
+      --text: #f0f0f0;
+      --muted: #888;
+      --radius: 12px;
+      --timer-full: #00e5a0;
+      --timer-mid: #ffd166;
+      --timer-low: #ff4d6d;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Syne', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      overflow-x: hidden;
+    }
+
+    /* ─── Background grid ─── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0,229,160,.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,229,160,.04) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .wrapper {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 680px;
+    }
+
+    /* ─── SCREEN BASE ─── */
+    .screen {
+      display: none;
+      animation: fadeUp .4s ease forwards;
+    }
+    .screen.active { display: block; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ─── CARD ─── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 2.5rem 2rem;
+    }
+
+    /* ─── HEADER BADGE ─── */
+    .badge {
+      display: inline-block;
+      background: var(--accent);
+      color: #000;
+      font-family: 'Space Mono', monospace;
+      font-size: .7rem;
+      font-weight: 700;
+      letter-spacing: .12em;
+      padding: .3rem .7rem;
+      border-radius: 4px;
+      margin-bottom: 1.2rem;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      line-height: 1.15;
+      margin-bottom: .6rem;
+    }
+    h1 span { color: var(--accent); }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: .95rem;
+      margin-bottom: 2rem;
+    }
+
+    /* ─── FORM ─── */
+    .form-group { margin-bottom: 1.2rem; }
+
+    label {
+      display: block;
+      font-size: .8rem;
+      font-weight: 600;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: .45rem;
+    }
+
+    input[type="text"],
+    input[type="email"],
+    input[type="number"] {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: 'Space Mono', monospace;
+      font-size: .95rem;
+      padding: .75rem 1rem;
+      outline: none;
+      transition: border-color .2s;
+    }
+    input:focus { border-color: var(--accent); }
+
+    .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+
+    /* ─── BUTTONS ─── */
+    .btn {
+      display: inline-block;
+      padding: .8rem 1.8rem;
+      border-radius: 8px;
+      border: none;
+      font-family: 'Syne', sans-serif;
+      font-size: .95rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all .2s;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #000;
+      width: 100%;
+    }
+    .btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); }
+
+    /* ─── PROGRESS BAR ─── */
+    .progress-bar-wrap {
+      background: var(--surface2);
+      border-radius: 99px;
+      height: 5px;
+      margin-bottom: 1.8rem;
+      overflow: hidden;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 99px;
+      transition: width .4s ease;
+    }
+
+    /* ─── QUIZ TOP ─── */
+    .quiz-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.2rem;
+    }
+    .q-counter {
+      font-family: 'Space Mono', monospace;
+      font-size: .8rem;
+      color: var(--muted);
+    }
+    .q-counter strong { color: var(--text); }
+
+    /* ─── TIMER ─── */
+    .timer-ring-wrap {
+      display: flex;
+      align-items: center;
+      gap: .6rem;
+    }
+    .timer-svg { width: 48px; height: 48px; transform: rotate(-90deg); }
+    .timer-bg { fill: none; stroke: var(--surface2); stroke-width: 4; }
+    .timer-arc {
+      fill: none;
+      stroke: var(--accent);
+      stroke-width: 4;
+      stroke-linecap: round;
+      stroke-dasharray: 126;
+      stroke-dashoffset: 0;
+      transition: stroke-dashoffset .9s linear, stroke .3s;
+    }
+    .timer-label {
+      font-family: 'Space Mono', monospace;
+      font-size: .85rem;
+      color: var(--text);
+      min-width: 38px;
+    }
+
+    /* ─── QUESTION ─── */
+    .question-text {
+      font-size: 1.15rem;
+      font-weight: 600;
+      line-height: 1.5;
+      margin-bottom: 1.5rem;
+    }
+
+    /* ─── OPTIONS ─── */
+    .options { display: flex; flex-direction: column; gap: .75rem; }
+
+    .option {
+      background: var(--surface2);
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      padding: .9rem 1.1rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: .9rem;
+      font-size: .95rem;
+      transition: all .18s;
+      user-select: none;
+    }
+    .option:hover:not(.disabled) { border-color: var(--accent); background: rgba(0,229,160,.07); }
+
+    .option-letter {
+      font-family: 'Space Mono', monospace;
+      font-size: .8rem;
+      background: var(--border);
+      color: var(--muted);
+      border-radius: 6px;
+      width: 28px; height: 28px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      transition: all .18s;
+    }
+
+    .option.correct { border-color: var(--accent); background: rgba(0,229,160,.12); }
+    .option.correct .option-letter { background: var(--accent); color: #000; }
+    .option.wrong { border-color: var(--accent2); background: rgba(255,77,109,.1); }
+    .option.wrong .option-letter { background: var(--accent2); color: #fff; }
+    .option.disabled { cursor: default; }
+
+    /* ─── FEEDBACK ─── */
+    .feedback {
+      margin-top: 1.2rem;
+      padding: .85rem 1rem;
+      border-radius: 8px;
+      font-size: .9rem;
+      font-weight: 600;
+      display: none;
+    }
+    .feedback.show { display: block; }
+    .feedback.correct { background: rgba(0,229,160,.1); color: var(--accent); border: 1px solid rgba(0,229,160,.25); }
+    .feedback.wrong   { background: rgba(255,77,109,.1); color: var(--accent2); border: 1px solid rgba(255,77,109,.25); }
+    .feedback.timeout { background: rgba(255,209,102,.1); color: var(--accent3); border: 1px solid rgba(255,209,102,.25); }
+
+    .next-btn-wrap { margin-top: 1.4rem; text-align: right; display: none; }
+    .next-btn-wrap.show { display: block; }
+
+    .btn-next {
+      background: transparent;
+      border: 1.5px solid var(--accent);
+      color: var(--accent);
+      font-family: 'Space Mono', monospace;
+      font-size: .85rem;
+      padding: .6rem 1.4rem;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all .2s;
+    }
+    .btn-next:hover { background: var(--accent); color: #000; }
+
+    /* ─── RESULTS ─── */
+    .score-display {
+      text-align: center;
+      padding: 1.5rem 0;
+    }
+    .score-big {
+      font-size: 5rem;
+      font-weight: 800;
+      color: var(--accent);
+      font-family: 'Space Mono', monospace;
+      line-height: 1;
+    }
+    .score-label { color: var(--muted); margin-top: .5rem; font-size: .95rem; }
+
+    .result-breakdown {
+      margin-top: 1.8rem;
+      display: flex;
+      flex-direction: column;
+      gap: .6rem;
+    }
+    .breakdown-item {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: .75rem 1rem;
+      font-size: .85rem;
+      display: flex;
+      gap: .6rem;
+      align-items: flex-start;
+    }
+    .breakdown-item .icon { flex-shrink: 0; font-size: 1rem; margin-top: .05rem; }
+    .breakdown-item .q-text { color: var(--muted); margin-bottom: .25rem; font-size: .8rem; }
+    .breakdown-item .a-text { font-weight: 600; }
+    .breakdown-item.ok .a-text { color: var(--accent); }
+    .breakdown-item.bad .a-text { color: var(--accent2); }
+    .breakdown-item .correct-ans { color: var(--accent); font-size: .78rem; margin-top: .2rem; }
+
+    .result-meta {
+      margin-top: 1.5rem;
+      padding: 1rem;
+      background: var(--surface2);
+      border-radius: 8px;
+      font-family: 'Space Mono', monospace;
+      font-size: .8rem;
+      color: var(--muted);
+    }
+    .result-meta strong { color: var(--text); }
+
+    .btn-restart {
+      margin-top: 1.5rem;
+      background: transparent;
+      border: 1.5px solid var(--border);
+      color: var(--muted);
+      font-family: 'Syne', sans-serif;
+      font-size: .9rem;
+      font-weight: 600;
+      padding: .7rem 1.4rem;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all .2s;
+      width: 100%;
+    }
+    .btn-restart:hover { border-color: var(--text); color: var(--text); }
+
+    /* ─── DIVIDER ─── */
+    .divider { border: none; border-top: 1px solid var(--border); margin: 1.5rem 0; }
+
+    .error-msg {
+      color: var(--accent2);
+      font-size: .82rem;
+      margin-top: .4rem;
+      display: none;
+    }
+    .error-msg.show { display: block; }
+
+    @media (max-width: 480px) {
+      .row-2 { grid-template-columns: 1fr; }
+      h1 { font-size: 1.6rem; }
+      .score-big { font-size: 4rem; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="wrapper">
+
+  <!-- ══════════════════ CREDENTIALS SCREEN ══════════════════ -->
+  <div class="screen active" id="screen-creds">
+    <div class="card">
+      <div class="badge">PHP Auth Quiz</div>
+      <h1>Enter Your <span>Details</span></h1>
+      <p class="subtitle">Your information will be recorded with your quiz result.</p>
+
+      <div class="row-2">
+        <div class="form-group">
+          <label for="inp-fname">First Name</label>
+          <input type="text" id="inp-fname" placeholder="Juan"/>
+          <div class="error-msg" id="err-fname">Required</div>
+        </div>
+        <div class="form-group">
+          <label for="inp-lname">Last Name</label>
+          <input type="text" id="inp-lname" placeholder="Dela Cruz"/>
+          <div class="error-msg" id="err-lname">Required</div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="inp-email">Email / Student ID</label>
+        <input type="text" id="inp-email" placeholder="student@school.edu"/>
+        <div class="error-msg" id="err-email">Required</div>
+      </div>
+
+      <div class="form-group">
+        <label for="inp-section">Section / Course</label>
+        <input type="text" id="inp-section" placeholder="BSIT 2A"/>
+      </div>
+
+      <hr class="divider"/>
+      <button class="btn btn-primary" onclick="startQuiz()">Start Quiz →</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════ QUIZ SCREEN ══════════════════ -->
+  <div class="screen" id="screen-quiz">
+    <div class="card">
+      <div class="progress-bar-wrap">
+        <div class="progress-bar-fill" id="progress-fill" style="width:0%"></div>
+      </div>
+
+      <div class="quiz-top">
+        <div class="q-counter">Question <strong id="q-num">1</strong> of <strong id="q-total">10</strong></div>
+        <div class="timer-ring-wrap">
+          <svg class="timer-svg" viewBox="0 0 44 44">
+            <circle class="timer-bg" cx="22" cy="22" r="20"/>
+            <circle class="timer-arc" id="timer-arc" cx="22" cy="22" r="20"/>
+          </svg>
+          <span class="timer-label" id="timer-label">3:00</span>
+        </div>
+      </div>
+
+      <div class="question-text" id="question-text"></div>
+      <div class="options" id="options-container"></div>
+
+      <div class="feedback" id="feedback"></div>
+      <div class="next-btn-wrap" id="next-wrap">
+        <button class="btn-next" onclick="nextQuestion()">Next →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════ RESULTS SCREEN ══════════════════ -->
+  <div class="screen" id="screen-results">
+    <div class="card">
+      <div class="badge">Quiz Complete</div>
+      <div class="score-display">
+        <div class="score-big" id="score-pct">0%</div>
+        <div class="score-label" id="score-sub">0 / 0 correct</div>
+      </div>
+
+      <div class="result-meta" id="result-meta"></div>
+
+      <hr class="divider"/>
+      <h2 style="font-size:1rem; margin-bottom:1rem; color:var(--muted); text-transform:uppercase; letter-spacing:.08em;">Review</h2>
+      <div class="result-breakdown" id="result-breakdown"></div>
+
+      <button class="btn-restart" onclick="restartQuiz()">↺ Retake Quiz</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ════════════════════════════════════════
+//  QUESTION BANK  (10 questions)
+// ════════════════════════════════════════
+const QUESTIONS = [
+  {
+    q: "In the provided code, what PHP function is used to hash the user's password before storing it in the database?",
+    opts: ["md5()", "sha1()", "password_hash()", "crypt()"],
+    ans: 2,
+    exp: "password_hash() with PASSWORD_BCRYPT is used in the register() method of the Auth class."
+  },
+  {
+    q: "Which PHP function is called in the login() method to verify the submitted password against the stored hash?",
+    opts: ["hash_equals()", "password_verify()", "strcmp()", "md5_check()"],
+    ans: 1,
+    exp: "password_verify($password, $user['password']) is used to compare the plaintext password against the bcrypt hash."
+  },
+  {
+    q: "What does session_regenerate_id(true) do when called during a successful login?",
+    opts: [
+      "Creates a brand new session and discards the old one",
+      "Deletes the current session data entirely",
+      "Renames the session cookie on the client",
+      "Logs the session ID into the database"
+    ],
+    ans: 0,
+    exp: "session_regenerate_id(true) creates a new session ID and deletes the old session file, preventing session fixation attacks."
+  },
+  {
+    q: "In logout.php, which function removes all session variables from memory before destroying the session?",
+    opts: ["session_destroy()", "session_unset()", "unset($_SESSION)", "session_reset()"],
+    ans: 1,
+    exp: "session_unset() clears all session variables, and then session_destroy() destroys the session itself."
+  },
+  {
+    q: "What is the correct order of operations in logout.php?",
+    opts: [
+      "session_destroy() → session_unset() → header()",
+      "session_start() → session_unset() → session_destroy() → header()",
+      "session_unset() → session_destroy() → header()",
+      "header() → session_unset() → session_destroy()"
+    ],
+    ans: 1,
+    exp: "You must call session_start() first, then session_unset(), then session_destroy(), and finally redirect with header()."
+  },
+  {
+    q: "In login.php, what check is performed at the very top before anything else?",
+    opts: [
+      "Whether the database connection is alive",
+      "Whether a POST request was submitted",
+      "Whether the user already has an active session (is logged in)",
+      "Whether the username field is empty"
+    ],
+    ans: 2,
+    exp: "The code checks isset($_SESSION['user_id']) and redirects to index.php if the user is already logged in."
+  },
+  {
+    q: "How should index.php protect itself so that only logged-in users can access it?",
+    opts: [
+      "Check if $_COOKIE['user'] is set",
+      "Check if $_SESSION['user_id'] is set; if not, redirect to login.php",
+      "Query the database on every page load to verify the user",
+      "Use .htaccess password protection"
+    ],
+    ans: 1,
+    exp: "At the top of index.php, call session_start() then check if $_SESSION['user_id'] is set; if not, use header('Location: login.php') and exit()."
+  },
+  {
+    q: "In the Auth class, what algorithm constant is passed to password_hash()?",
+    opts: ["PASSWORD_DEFAULT", "PASSWORD_MD5", "PASSWORD_BCRYPT", "PASSWORD_SHA256"],
+    ans: 2,
+    exp: "PASSWORD_BCRYPT is explicitly passed as the second argument to password_hash() in the register() method."
+  },
+  {
+    q: "Why does the login() method return ['success' => false, 'message' => 'Invalid username or password'] for BOTH a wrong username AND a wrong password?",
+    opts: [
+      "It is a coding mistake — the messages should differ",
+      "To prevent user enumeration attacks (not revealing which one was wrong)",
+      "Because PHP cannot distinguish between the two errors",
+      "To simplify the UI for the developer"
+    ],
+    ans: 1,
+    exp: "Returning the same message for both cases prevents attackers from discovering which usernames exist in the system (user enumeration)."
+  },
+  {
+    q: "In demo.php vs login.php, what is a key security difference in how they handle the password before storing it in the session?",
+    opts: [
+      "demo.php hashes the password; login.php stores it plaintext",
+      "Both are identical in security",
+      "demo.php stores the plaintext password in the session; login.php never stores the password at all",
+      "login.php uses AES encryption while demo.php uses bcrypt"
+    ],
+    ans: 2,
+    exp: "demo.php stores the raw plaintext password in $_SESSION['password'], which is a major security flaw. The proper login.php never stores the password in the session — it only stores user_id and username."
+  }
+];
+
+// ════════════════════════════════════════
+//  STATE
+// ════════════════════════════════════════
+const TIMER_SECONDS = 180; // 3 minutes
+const CIRCUMFERENCE = 2 * Math.PI * 20; // ~125.66
+
+let student = {};
+let currentQ = 0;
+let score = 0;
+let answers = [];
+let timerInterval = null;
+let secondsLeft = TIMER_SECONDS;
+let answered = false;
+
+// ════════════════════════════════════════
+//  SCREENS
+// ════════════════════════════════════════
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ════════════════════════════════════════
+//  START
+// ════════════════════════════════════════
+function startQuiz() {
+  const fname   = document.getElementById('inp-fname').value.trim();
+  const lname   = document.getElementById('inp-lname').value.trim();
+  const email   = document.getElementById('inp-email').value.trim();
+  const section = document.getElementById('inp-section').value.trim();
+
+  let valid = true;
+  ['fname','lname','email'].forEach(f => {
+    const val = document.getElementById(`inp-${f}`).value.trim();
+    const err = document.getElementById(`err-${f}`);
+    if (!val) { err.classList.add('show'); valid = false; }
+    else err.classList.remove('show');
+  });
+  if (!valid) return;
+
+  student = { fname, lname, email, section, startTime: new Date().toISOString() };
+  currentQ = 0; score = 0; answers = [];
+
+  document.getElementById('q-total').textContent = QUESTIONS.length;
+  showScreen('screen-quiz');
+  renderQuestion();
+}
+
+// ════════════════════════════════════════
+//  RENDER QUESTION
+// ════════════════════════════════════════
+function renderQuestion() {
+  answered = false;
+  const q = QUESTIONS[currentQ];
+  const letters = ['A','B','C','D'];
+
+  document.getElementById('q-num').textContent = currentQ + 1;
+  document.getElementById('progress-fill').style.width =
+    ((currentQ / QUESTIONS.length) * 100) + '%';
+  document.getElementById('question-text').textContent = q.q;
+
+  const container = document.getElementById('options-container');
+  container.innerHTML = '';
+  q.opts.forEach((opt, i) => {
+    const el = document.createElement('div');
+    el.className = 'option';
+    el.dataset.idx = i;
+    el.innerHTML = `<span class="option-letter">${letters[i]}</span><span>${opt}</span>`;
+    el.addEventListener('click', () => selectAnswer(i));
+    container.appendChild(el);
+  });
+
+  const fb = document.getElementById('feedback');
+  fb.className = 'feedback';
+  fb.textContent = '';
+  document.getElementById('next-wrap').classList.remove('show');
+
+  startTimer();
+}
+
+// ════════════════════════════════════════
+//  TIMER
+// ════════════════════════════════════════
+function startTimer() {
+  clearInterval(timerInterval);
+  secondsLeft = TIMER_SECONDS;
+  updateTimerUI(secondsLeft);
+
+  timerInterval = setInterval(() => {
+    secondsLeft--;
+    updateTimerUI(secondsLeft);
+    if (secondsLeft <= 0) {
+      clearInterval(timerInterval);
+      timeOut();
+    }
+  }, 1000);
+}
+
+function updateTimerUI(s) {
+  const mins = Math.floor(s / 60);
+  const secs = s % 60;
+  document.getElementById('timer-label').textContent =
+    `${mins}:${secs.toString().padStart(2,'0')}`;
+
+  const arc = document.getElementById('timer-arc');
+  const ratio = s / TIMER_SECONDS;
+  arc.style.strokeDashoffset = CIRCUMFERENCE * (1 - ratio);
+
+  // color shift
+  if (ratio > .5)       arc.style.stroke = 'var(--timer-full)';
+  else if (ratio > .25) arc.style.stroke = 'var(--timer-mid)';
+  else                  arc.style.stroke = 'var(--timer-low)';
+}
+
+function timeOut() {
+  if (answered) return;
+  answered = true;
+  lockOptions();
+  highlightCorrect();
+  showFeedback('timeout', `⏰ Time's up! The correct answer was: ${QUESTIONS[currentQ].opts[QUESTIONS[currentQ].ans]}`);
+  answers.push({ q: currentQ, selected: null, correct: false });
+  document.getElementById('next-wrap').classList.add('show');
+}
+
+// ════════════════════════════════════════
+//  SELECT ANSWER
+// ════════════════════════════════════════
+function selectAnswer(idx) {
+  if (answered) return;
+  answered = true;
+  clearInterval(timerInterval);
+
+  const q = QUESTIONS[currentQ];
+  const isCorrect = idx === q.ans;
+  if (isCorrect) score++;
+  answers.push({ q: currentQ, selected: idx, correct: isCorrect });
+
+  const opts = document.querySelectorAll('.option');
+  opts.forEach(o => o.classList.add('disabled'));
+  opts[idx].classList.add(isCorrect ? 'correct' : 'wrong');
+  if (!isCorrect) opts[q.ans].classList.add('correct');
+
+  if (isCorrect) {
+    showFeedback('correct', `✓ Correct! ${q.exp}`);
+  } else {
+    showFeedback('wrong', `✗ Incorrect. ${q.exp}`);
+  }
+  document.getElementById('next-wrap').classList.add('show');
+}
+
+function lockOptions() {
+  document.querySelectorAll('.option').forEach(o => o.classList.add('disabled'));
+}
+function highlightCorrect() {
+  const opts = document.querySelectorAll('.option');
+  opts[QUESTIONS[currentQ].ans].classList.add('correct');
+}
+
+function showFeedback(type, msg) {
+  const fb = document.getElementById('feedback');
+  fb.className = `feedback ${type} show`;
+  fb.textContent = msg;
+}
+
+// ════════════════════════════════════════
+//  NEXT QUESTION
+// ════════════════════════════════════════
+function nextQuestion() {
+  currentQ++;
+  if (currentQ >= QUESTIONS.length) {
+    showResults();
+  } else {
+    renderQuestion();
+  }
+}
+
+// ════════════════════════════════════════
+//  RESULTS
+// ════════════════════════════════════════
+function showResults() {
+  clearInterval(timerInterval);
+  document.getElementById('progress-fill').style.width = '100%';
+
+  const pct = Math.round((score / QUESTIONS.length) * 100);
+  document.getElementById('score-pct').textContent = pct + '%';
+  document.getElementById('score-sub').textContent = `${score} / ${QUESTIONS.length} correct`;
+
+  const endTime = new Date().toISOString();
+  document.getElementById('result-meta').innerHTML =
+    `<strong>${student.fname} ${student.lname}</strong> &nbsp;|&nbsp; ${student.email}` +
+    (student.section ? ` &nbsp;|&nbsp; ${student.section}` : '') +
+    `<br/>Completed: ${new Date(endTime).toLocaleString()}`;
+
+  const breakdown = document.getElementById('result-breakdown');
+  breakdown.innerHTML = '';
+  answers.forEach((a, i) => {
+    const q = QUESTIONS[a.q];
+    const el = document.createElement('div');
+    el.className = `breakdown-item ${a.correct ? 'ok' : 'bad'}`;
+    const userAns = a.selected !== null ? q.opts[a.selected] : 'No answer (timed out)';
+    el.innerHTML = `
+      <div class="icon">${a.correct ? '✓' : '✗'}</div>
+      <div>
+        <div class="q-text">Q${i+1}: ${q.q}</div>
+        <div class="a-text">${userAns}</div>
+        ${!a.correct ? `<div class="correct-ans">Correct: ${q.opts[q.ans]}</div>` : ''}
+      </div>`;
+    breakdown.appendChild(el);
+  });
+
+  // Save to localStorage for the teacher's reference
+  saveResult(pct, endTime);
+  showScreen('screen-results');
+}
+
+function saveResult(pct, endTime) {
+  const record = {
+    name: `${student.fname} ${student.lname}`,
+    email: student.email,
+    section: student.section,
+    score: score,
+    total: QUESTIONS.length,
+    pct,
+    date: endTime,
+    answers: answers.map(a => ({
+      question: QUESTIONS[a.q].q,
+      selected: a.selected !== null ? QUESTIONS[a.q].opts[a.selected] : 'Timed out',
+      correct: QUESTIONS[a.q].opts[QUESTIONS[a.q].ans],
+      isCorrect: a.correct
+    }))
+  };
+
+  const stored = JSON.parse(localStorage.getItem('quiz_results') || '[]');
+  stored.push(record);
+  localStorage.setItem('quiz_results', JSON.stringify(stored));
+}
+
+// ════════════════════════════════════════
+//  RESTART
+// ════════════════════════════════════════
+function restartQuiz() {
+  showScreen('screen-creds');
+}
+</script>
+</body>
+</html>
