@@ -594,18 +594,67 @@ const QUESTIONS = [
 })();
 
 // ════════════════════════════════════════
+//  CONSTANTS
+// ════════════════════════════════════════
+const TIMER_SECONDS = 90;
+const CIRCUMFERENCE = 2 * Math.PI * 20;
+const SESSION_KEY   = 'quiz_session';
+const SHEET_URL     = 'https://script.google.com/macros/s/AKfycbw12YJ95KhZGv29weN1BiVvjzSPDkHlMaU4RKBl8N6k1e_hlbg31kiJh0VWrLRkGrUL/exec';
+
+// ════════════════════════════════════════
 //  STATE
 // ════════════════════════════════════════
-const TIMER_SECONDS = 90; // 
-const CIRCUMFERENCE = 2 * Math.PI * 20; // ~125.66
+let student      = {};
+let currentQ     = 0;
+let score        = 0;
+let answers      = [];
+let timerInterval= null;
+let secondsLeft  = TIMER_SECONDS;
+let answered     = false;
 
-let student = {};
-let currentQ = 0;
-let score = 0;
-let answers = [];
-let timerInterval = null;
-let secondsLeft = TIMER_SECONDS;
-let answered = false;
+// ════════════════════════════════════════
+//  SESSION HELPERS
+// ════════════════════════════════════════
+function saveSession() {
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify({
+    student, currentQ, score, answers, secondsLeft, answered
+  }));
+}
+
+function loadSession() {
+  const raw = sessionStorage.getItem(SESSION_KEY);
+  return raw ? JSON.parse(raw) : null;
+}
+
+function clearSession() {
+  sessionStorage.removeItem(SESSION_KEY);
+}
+
+// ════════════════════════════════════════
+//  BOOT — runs on page load
+// ════════════════════════════════════════
+(function boot() {
+  const sess = loadSession();
+  if (!sess) { showScreen('screen-creds'); return; }
+
+  // Restore state
+  student     = sess.student;
+  currentQ    = sess.currentQ;
+  score       = sess.score;
+  answers     = sess.answers;
+  secondsLeft = sess.secondsLeft;
+  answered    = sess.answered;
+
+  document.getElementById('q-total').textContent = QUESTIONS.length;
+
+  if (currentQ >= QUESTIONS.length) {
+    // They finished — go straight to results (no re-submit)
+    renderResultsOnly();
+  } else {
+    showScreen('screen-quiz');
+    renderQuestion(true); // true = resume mode (use saved secondsLeft)
+  }
+})();
 
 // ════════════════════════════════════════
 //  SCREENS
@@ -633,19 +682,25 @@ function startQuiz() {
   });
   if (!valid) return;
 
-  student = { fname, lname, email, section, startTime: new Date().toISOString() };
-  currentQ = 0; score = 0; answers = [];
+  student     = { fname, lname, email, section, startTime: new Date().toISOString() };
+  currentQ    = 0;
+  score       = 0;
+  answers     = [];
+  secondsLeft = TIMER_SECONDS;
 
   document.getElementById('q-total').textContent = QUESTIONS.length;
+  saveSession();
   showScreen('screen-quiz');
-  renderQuestion();
+  renderQuestion(false);
 }
 
 // ════════════════════════════════════════
 //  RENDER QUESTION
+//  resume=true → use existing secondsLeft
+//  resume=false → fresh 3-min timer
 // ════════════════════════════════════════
-function renderQuestion() {
-  answered = false;
+function renderQuestion(resume) {
+  answered = resume ? answered : false;
   const q = QUESTIONS[currentQ];
   const letters = ['A','B','C','D'];
 
@@ -670,7 +725,35 @@ function renderQuestion() {
   fb.textContent = '';
   document.getElementById('next-wrap').classList.remove('show');
 
+  // If resuming a question that was already answered, restore its state
+  if (resume && answered) {
+    const last = answers[answers.length - 1];
+    restoreAnsweredState(last);
+  } else if (!resume) {
+    secondsLeft = TIMER_SECONDS;
+  }
+
   startTimer();
+  saveSession();
+}
+
+// Restore visual state for an already-answered question on resume
+function restoreAnsweredState(a) {
+  const opts = document.querySelectorAll('.option');
+  opts.forEach(o => o.classList.add('disabled'));
+
+  if (a.selected !== null) {
+    opts[a.selected].classList.add(a.correct ? 'correct' : 'wrong');
+    if (!a.correct) opts[QUESTIONS[currentQ].ans].classList.add('correct');
+    const q = QUESTIONS[currentQ];
+    showFeedback(a.correct ? 'correct' : 'wrong',
+      a.correct ? `✓ Correct! ${q.exp}` : `✗ Incorrect. ${q.exp}`);
+  } else {
+    // timed out
+    opts[QUESTIONS[currentQ].ans].classList.add('correct');
+    showFeedback('timeout', `⏰ Time's up! The correct answer was: ${QUESTIONS[currentQ].opts[QUESTIONS[currentQ].ans]}`);
+  }
+  document.getElementById('next-wrap').classList.add('show');
 }
 
 // ════════════════════════════════════════
@@ -678,11 +761,14 @@ function renderQuestion() {
 // ════════════════════════════════════════
 function startTimer() {
   clearInterval(timerInterval);
-  secondsLeft = TIMER_SECONDS;
   updateTimerUI(secondsLeft);
+
+  // If the question is already answered, don't tick
+  if (answered) return;
 
   timerInterval = setInterval(() => {
     secondsLeft--;
+    saveSession(); // persist remaining time every second
     updateTimerUI(secondsLeft);
     if (secondsLeft <= 0) {
       clearInterval(timerInterval);
@@ -701,7 +787,6 @@ function updateTimerUI(s) {
   const ratio = s / TIMER_SECONDS;
   arc.style.strokeDashoffset = CIRCUMFERENCE * (1 - ratio);
 
-  // color shift
   if (ratio > .5)       arc.style.stroke = 'var(--timer-full)';
   else if (ratio > .25) arc.style.stroke = 'var(--timer-mid)';
   else                  arc.style.stroke = 'var(--timer-low)';
@@ -715,6 +800,7 @@ function timeOut() {
   showFeedback('timeout', `⏰ Time's up! The correct answer was: ${QUESTIONS[currentQ].opts[QUESTIONS[currentQ].ans]}`);
   answers.push({ q: currentQ, selected: null, correct: false });
   document.getElementById('next-wrap').classList.add('show');
+  saveSession();
 }
 
 // ════════════════════════════════════════
@@ -735,22 +821,19 @@ function selectAnswer(idx) {
   opts[idx].classList.add(isCorrect ? 'correct' : 'wrong');
   if (!isCorrect) opts[q.ans].classList.add('correct');
 
-  if (isCorrect) {
-    showFeedback('correct', `✓ Correct! ${q.exp}`);
-  } else {
-    showFeedback('wrong', `✗ Incorrect. ${q.exp}`);
-  }
+  showFeedback(isCorrect ? 'correct' : 'wrong',
+    isCorrect ? `✓ Correct! ${q.exp}` : `✗ Incorrect. ${q.exp}`);
+
   document.getElementById('next-wrap').classList.add('show');
+  saveSession();
 }
 
 function lockOptions() {
   document.querySelectorAll('.option').forEach(o => o.classList.add('disabled'));
 }
 function highlightCorrect() {
-  const opts = document.querySelectorAll('.option');
-  opts[QUESTIONS[currentQ].ans].classList.add('correct');
+  document.querySelectorAll('.option')[QUESTIONS[currentQ].ans].classList.add('correct');
 }
-
 function showFeedback(type, msg) {
   const fb = document.getElementById('feedback');
   fb.className = `feedback ${type} show`;
@@ -762,10 +845,14 @@ function showFeedback(type, msg) {
 // ════════════════════════════════════════
 function nextQuestion() {
   currentQ++;
+  answered = false;
+  secondsLeft = TIMER_SECONDS;
+  saveSession();
+
   if (currentQ >= QUESTIONS.length) {
     showResults();
   } else {
-    renderQuestion();
+    renderQuestion(false);
   }
 }
 
@@ -775,7 +862,12 @@ function nextQuestion() {
 function showResults() {
   clearInterval(timerInterval);
   document.getElementById('progress-fill').style.width = '100%';
+  renderResultsOnly();
+  saveResult();
+  clearSession(); // wipe session after submitting
+}
 
+function renderResultsOnly() {
   const pct = Math.round((score / QUESTIONS.length) * 100);
   document.getElementById('score-pct').textContent = pct + '%';
   document.getElementById('score-sub').textContent = `${score} / ${QUESTIONS.length} correct`;
@@ -804,11 +896,10 @@ function showResults() {
   });
 
   showScreen('screen-results');
-  saveResult(pct, endTime);
 }
 
-async function saveResult(pct, endTime) {
-  const SHEET_URL = 'https://script.google.com/macros/s/AKfycbw12YJ95KhZGv29weN1BiVvjzSPDkHlMaU4RKBl8N6k1e_hlbg31kiJh0VWrLRkGrUL/exec';
+async function saveResult() {
+  const pct = Math.round((score / QUESTIONS.length) * 100);
 
   const answerSummary = answers.map((a, i) => {
     const q = QUESTIONS[a.q];
@@ -820,13 +911,10 @@ async function saveResult(pct, endTime) {
     name: `${student.fname} ${student.lname}`,
     email: student.email,
     section: student.section || '—',
-    score: score,
-    total: QUESTIONS.length,
-    pct,
+    score, total: QUESTIONS.length, pct,
     answers: answerSummary
   };
 
-  // Show submitting status
   const statusEl = document.getElementById('submit-status');
   statusEl.className = 'submit-status submitting';
   statusEl.textContent = '⏳ Submitting your result to Google Sheets…';
@@ -850,6 +938,7 @@ async function saveResult(pct, endTime) {
 //  RESTART
 // ════════════════════════════════════════
 function restartQuiz() {
+  clearSession();
   showScreen('screen-creds');
 }
 </script>
